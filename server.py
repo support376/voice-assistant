@@ -5,6 +5,7 @@ import numpy as np
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 
 from config import GEMINI_API_KEY, SAMPLE_RATE_INPUT
@@ -19,6 +20,13 @@ from voice_register import quick_register
 from notifier import generate_tts_bytes
 
 app = FastAPI(title="음성 비서")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 WEB_DIR = Path(__file__).parent / "web_ui"
 

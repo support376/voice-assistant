@@ -119,10 +119,32 @@
         .audio-label {
             font-size: 0.75rem; color: #666; min-width: 24px; text-align: right;
         }
+        .server-bar {
+            width: 100%; max-width: 500px; display: flex; gap: 8px;
+            margin-bottom: 20px; align-items: center;
+        }
+        .server-bar input {
+            flex: 1; padding: 8px 12px; border: 1px solid #333; border-radius: 6px;
+            background: #1a1a1a; color: #fff; font-size: 0.85rem;
+        }
+        .server-bar .dot {
+            width: 10px; height: 10px; border-radius: 50%; background: #ff3b3b;
+        }
+        .server-bar .dot.connected { background: #4caf50; }
+        .server-bar button {
+            padding: 8px 14px; border: 1px solid #333; border-radius: 6px;
+            background: #1a1a1a; color: #aaa; cursor: pointer; font-size: 0.8rem;
+        }
     </style>
 </head>
 <body>
     <h1>음성 비서</h1>
+
+    <div class="server-bar">
+        <div class="dot" id="server-dot"></div>
+        <input type="text" id="server-url" value="localhost:8000" placeholder="백엔드 주소 (예: localhost:8000)">
+        <button onclick="checkServer()">연결</button>
+    </div>
 
     <div class="tabs">
         <div class="tab active" data-panel="live">실시간 대화</div>
@@ -182,6 +204,21 @@
     </div>
 
     <script>
+    // --- Server connection ---
+    function getServerUrl() { return document.getElementById('server-url').value.trim(); }
+    function getWsUrl() { return `ws://${getServerUrl()}`; }
+    function getHttpUrl() { return `http://${getServerUrl()}`; }
+
+    async function checkServer() {
+        const dot = document.getElementById('server-dot');
+        try {
+            const res = await fetch(`${getHttpUrl()}/api/conversations`, { signal: AbortSignal.timeout(3000) });
+            if (res.ok) { dot.classList.add('connected'); }
+            else { dot.classList.remove('connected'); }
+        } catch(e) { dot.classList.remove('connected'); }
+    }
+    checkServer();
+
     // --- Tabs ---
     document.querySelectorAll('.tab').forEach(tab => {
         tab.addEventListener('click', () => {
@@ -247,8 +284,7 @@
             document.getElementById('live-monitor')
         );
 
-        const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-        liveWs = new WebSocket(`${protocol}//${location.host}/ws/live`);
+        liveWs = new WebSocket(`${getWsUrl()}/ws/live`);
 
         liveWs.onmessage = (evt) => {
             const msg = JSON.parse(evt.data);
@@ -319,8 +355,7 @@
             document.getElementById('record-monitor')
         );
 
-        const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-        recordWs = new WebSocket(`${protocol}//${location.host}/ws/record`);
+        recordWs = new WebSocket(`${getWsUrl()}/ws/record`);
 
         recordWs.onopen = () => startMicStream(recordWs);
 
@@ -462,7 +497,7 @@
     async function loadHistory() {
         const list = document.getElementById('history-list');
         try {
-            const res = await fetch('/api/conversations');
+            const res = await fetch(`${getHttpUrl()}/api/conversations`);
             const convs = await res.json();
             if (convs.length === 0) {
                 list.innerHTML = '<div style="color:#666">기록이 없습니다</div>';
@@ -481,7 +516,7 @@
 
     async function loadConv(id) {
         try {
-            const res = await fetch(`/api/conversations/${id}`);
+            const res = await fetch(`${getHttpUrl()}/api/conversations/${id}`);
             const utts = await res.json();
             const list = document.getElementById('history-list');
             list.innerHTML = `<button class="btn" onclick="loadHistory()" style="margin-bottom:12px">← 돌아가기</button>`;
@@ -539,8 +574,7 @@
         for (const c of chunks) { total.set(c, offset); offset += c.length; }
         const b64 = btoa(String.fromCharCode(...total));
 
-        const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const ws = new WebSocket(`${protocol}//${location.host}/ws/register`);
+        const ws = new WebSocket(`${getWsUrl()}/ws/register`);
         ws.onopen = () => ws.send(JSON.stringify({ name, is_owner: isOwner, audio: b64 }));
         ws.onmessage = (evt) => {
             const msg = JSON.parse(evt.data);
